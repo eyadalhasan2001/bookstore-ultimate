@@ -1,0 +1,233 @@
+﻿<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BookStore Ultimate</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f7fb;
+            color: #1a1a2e;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #0f2b1d, #1a472a);
+            color: #fff;
+            padding: 15px 0;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+
+        .container {
+            max-width: 1300px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .logo {
+            font-size: 28px;
+            font-weight: bold;
+        }
+
+        .search-bar {
+            flex: 1;
+            max-width: 350px;
+            display: flex;
+        }
+
+            .search-bar input {
+                width: 100%;
+                padding: 10px 15px;
+                border: none;
+                border-radius: 25px 0 0 25px;
+            }
+
+            .search-bar button {
+                padding: 10px 20px;
+                background: #ffd700;
+                border: none;
+                border-radius: 0 25px 25px 0;
+                cursor: pointer;
+            }
+
+        .nav-icons a {
+            color: white;
+            font-size: 20px;
+            margin-left: 15px;
+            text-decoration: none;
+        }
+
+        .hero {
+            background: linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.5)), url('https://images.unsplash.com/photo-1507842217343-583bb7270b66?w=1200');
+            background-size: cover;
+            height: 350px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            color: white;
+        }
+
+        .btn {
+            padding: 12px 30px;
+            background: #ffd700;
+            color: #1a472a;
+            border: none;
+            border-radius: 30px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .books-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+            gap: 30px;
+            margin-top: 30px;
+        }
+
+        .book-card {
+            background: white;
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            padding: 15px;
+        }
+
+        .book-title {
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        .book-price {
+            color: #2d6a4f;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+
+        footer {
+            background: #0f2b1d;
+            color: white;
+            text-align: center;
+            padding: 30px;
+            margin-top: 50px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="container">
+            <div class="header-content">
+                <div class="logo">📚 BookStore Ultimate</div>
+                <div class="search-bar">
+                    <input type="text" id="searchInput" placeholder="ابحث عن كتاب...">
+                    <button onclick="searchBooks()">🔍</button>
+                </div>
+                <div class="nav-icons">
+                    <a href="#" onclick="openLoginModal()">👤</a>
+                    <a href="#" onclick="openCart()">🛒 <span id="cartCount">0</span></a>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="hero">
+        <div><h1>اكتشف عالم الكتب</h1><button class="btn" onclick="loadBooks()">تسوق الآن</button></div>
+    </div>
+    <div class="container">
+        <div class="books-grid" id="booksGrid">⏳ جاري التحميل...</div>
+    </div>
+    <footer>© 2026 BookStore Ultimate</footer>
+
+    <script>
+    const API_URL = window.location.origin + '/api';
+    let token = localStorage.getItem('token');
+    let cart = [];
+
+    async function loadBooks() {
+        let search = document.getElementById('searchInput').value;
+        let url = API_URL + '/books?page=1&limit=12';
+        if (search) url += '&search=' + search;
+        try {
+            let res = await fetch(url);
+            let data = await res.json();
+            if (data.success) displayBooks(data.books);
+            else document.getElementById('booksGrid').innerHTML = '<p>لا توجد كتب</p>';
+        } catch(e) { document.getElementById('booksGrid').innerHTML = '<p style="color:red">❌ لا يمكن الاتصال بالخادم</p>'; }
+    }
+
+    function displayBooks(books) {
+        let grid = document.getElementById('booksGrid');
+        grid.innerHTML = '';
+        books.forEach(book => {
+            grid.innerHTML += `<div class="book-card"><div class="book-title">${book.title}</div><div class="book-price">${book.price_physical} د.ل</div><button class="btn" onclick="addToCart(${book.id})">➕ أضف</button></div>`;
+        });
+    }
+
+    async function addToCart(bookId) {
+        if (!token) { alert('يرجى تسجيل الدخول أولاً'); openLoginModal(); return; }
+        let res = await fetch(API_URL + '/cart/add', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+            body: JSON.stringify({ bookId, quantity: 1 })
+        });
+        if (res.ok) { alert('تمت الإضافة'); loadCart(); }
+    }
+
+    async function loadCart() {
+        if (!token) return;
+        let res = await fetch(API_URL + '/cart', { headers: { 'Authorization': 'Bearer ' + token } });
+        let data = await res.json();
+        if (data.success) {
+            cart = data.cart;
+            document.getElementById('cartCount').innerText = cart.reduce((s,i)=>s+i.quantity,0);
+        }
+    }
+
+    function openLoginModal() {
+        let email = prompt('البريد الإلكتروني (user@bookstore.com)');
+        if (!email) return;
+        let password = prompt('كلمة المرور (user123)');
+        fetch(API_URL + '/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password })
+        }).then(res=>res.json()).then(data=>{
+            if (data.success) {
+                token = data.token;
+                localStorage.setItem('token', token);
+                alert('تم تسجيل الدخول');
+                loadBooks(); loadCart();
+            } else alert('بيانات غير صحيحة');
+        });
+    }
+
+    function openCart() {
+        if (!cart.length) alert('السلة فارغة');
+        else {
+            let msg = 'سلة التسوق:\n';
+            cart.forEach(item => msg += `${item.title} : ${item.quantity} × ${item.price_physical} = ${item.price_physical * item.quantity} د.ل\n`);
+            alert(msg);
+        }
+    }
+
+    function searchBooks() { loadBooks(); }
+    loadBooks();
+    </script>
+</body>
+</html>
