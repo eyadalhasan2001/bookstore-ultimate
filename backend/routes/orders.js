@@ -1,43 +1,39 @@
+// routes/orders.js
 const express = require('express');
-const pool = require('../config/database');
-const auth = require('../middleware/auth');
+const { pool } = require('../config/database');
+const { authenticate } = require('../middleware/auth');
+
 const router = express.Router();
 
-router.post('/', auth, async (req, res) => {
+router.post('/', authenticate, async (req, res) => {
     const { address } = req.body;
-    const client = await pool.connect();
     try {
-        await client.query('BEGIN');
-        const { rows: cartItems } = await client.query(
-            `SELECT c.book_id, c.quantity, b.price_physical
-             FROM cart c JOIN books b ON c.book_id = b.id WHERE c.user_id = $1`, [req.userId]);
-        if (!cartItems.length) throw new Error('empty');
+        const cartItems = await pool.query(`SELECT c.*, b.price_physical FROM cart c JOIN books b ON c.book_id = b.id WHERE c.customer_id = $1`, [req.customerId]);
+        if (cartItems.rows.length === 0) return res.status(400).json({ success: false, message: 'Cart is empty' });
         let total = 0;
-        cartItems.forEach(i => total += i.price_physical * i.quantity);
+        cartItems.rows.forEach(item => { total += item.price_physical * item.quantity; });
         const orderNumber = 'ORD-' + Date.now() + '-' + Math.floor(Math.random() * 10000);
-        const { rows: orderRes } = await client.query(
-            `INSERT INTO orders (order_number, user_id, total, address) VALUES ($1,$2,$3,$4) RETURNING id`,
-            [orderNumber, req.userId, total, address]);
-        const orderId = orderRes[0].id;
-        for (const it of cartItems) {
-            await client.query(`INSERT INTO order_items (order_id, book_id, quantity, price) VALUES ($1,$2,$3,$4)`,
-                [orderId, it.book_id, it.quantity, it.price_physical]);
-            await client.query(`UPDATE books SET stock_physical = stock_physical - $1 WHERE id = $2`, [it.quantity, it.book_id]);
+        await pool.query(`INSERT INTO orders (order_number, customer_id, total_amount, address) VALUES ($1, $2, $3, $4)`, [orderNumber, req.customerId, total, address]);
+        const orderIdRes = await pool.query(`SELECT id FROM orders WHERE order_number = $1`, [orderNumber]);
+        const orderId = orderIdRes.rows[0].id;
+        for (const item of cartItems.rows) {
+            await pool.query(`INSERT INTO order_items (order_id, book_id, quantity, price) VALUES ($1, $2, $3, $4)`, [orderId, item.book_id, item.quantity, item.price_physical]);
         }
-        await client.query(`DELETE FROM cart WHERE user_id = $1`, [req.userId]);
-        const pointsEarned = Math.floor(total / 10);
-        await client.query(`UPDATE users SET points = points + $1 WHERE id = $2`, [pointsEarned, req.userId]);
-        await client.query('COMMIT');
-        res.json({ success: true, orderNumber, pointsEarned });
-    } catch (e) {
-        await client.query('ROLLBACK');
-        res.status(400).json({ success: false, message: e.message === 'empty' ? 'ÇáÓáÉ ÝÇÑÛÉ' : 'ÎØÃ Ýí ÅäÔÇÁ ÇáØáÈ' });
-    } finally { client.release(); }
+        await pool.query(`DELETE FROM cart WHERE customer_id = $1`, [req.customerId]);
+        res.json({ success: true, orderNumber });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Error placing order' });
+    }
 });
 
-router.get('/', auth, async (req, res) => {
-    const { rows } = await pool.query(`SELECT * FROM orders WHERE user_id = $1 ORDER BY created_at DESC`, [req.userId]);
-    res.json({ success: true, orders: rows });
+router.get('/', authenticate, async (req, res) => {
+    try {
+        const { rows } = await pool.query(`SELECT * FROM orders WHERE customer_id = $1 ORDER BY created_at DESC`, [req.customerId]);
+        res.json({ success: true, orders: rows });
+    } catch (err) {
+        res.status(500).json({ success: false, message: 'Error fetching orders' });
+    }
 });
 
 module.exports = router;
