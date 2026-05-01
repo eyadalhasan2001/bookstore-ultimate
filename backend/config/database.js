@@ -1,5 +1,4 @@
-﻿// config/database.js
-const { Pool } = require('pg');
+﻿const { Pool } = require('pg');
 const bcrypt = require('bcryptjs');
 
 const pool = new Pool({
@@ -72,36 +71,21 @@ const createTables = async () => {
     console.log('✅ All tables created');
 };
 
-const initDefaultData = async () => {
-    const demoExists = await pool.query(`SELECT * FROM customers WHERE email = 'user@bookstore.com'`);
-    if (demoExists.rows.length === 0) {
-        const hashed = await bcrypt.hash('user123', 10);
-        await pool.query(`INSERT INTO customers (email, password_hash, full_name) VALUES ($1, $2, $3)`,
-            ['user@bookstore.com', hashed, 'مستخدم تجريبي']);
-        console.log('✅ Demo user: user@bookstore.com / user123');
-    }
-    const adminExists = await pool.query(`SELECT * FROM customers WHERE email = 'admin@bookstore.com'`);
-    if (adminExists.rows.length === 0) {
-        const hashed = await bcrypt.hash('admin123', 10);
-        await pool.query(`INSERT INTO customers (email, password_hash, full_name) VALUES ($1, $2, $3)`,
-            ['admin@bookstore.com', hashed, 'مدير الموقع']);
-        console.log('✅ Admin user: admin@bookstore.com / admin123');
-    }
-    const booksCount = await pool.query(`SELECT COUNT(*) FROM books`);
-    if (parseInt(booksCount.rows[0].count) === 0) {
-        const sampleBooks = [
-            { title: 'الأب الغني والأب الفقير', author: 'روبرت كيوساكي', price_physical: 45, category: 'تطوير ذات', cover_icon: '💰', stock_physical: 50, featured: 1, rating_avg: 4.5 },
-            { title: 'العادات السبع للناس الأكثر فعالية', author: 'ستيفن كوفي', price_physical: 55, category: 'تطوير ذات', cover_icon: '📚', stock_physical: 40, featured: 1, rating_avg: 4.8 },
-            { title: 'مئة عام من العزلة', author: 'غابرييل غارسيا ماركيز', price_physical: 65, category: 'روايات', cover_icon: '📖', stock_physical: 30, featured: 1, rating_avg: 4.9 }
-        ];
-        for (const book of sampleBooks) {
-            await pool.query(`
-                INSERT INTO books (title, author, price_physical, category, cover_icon, stock_physical, featured, rating_avg)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-            `, [book.title, book.author, book.price_physical, book.category, book.cover_icon, book.stock_physical, book.featured, book.rating_avg]);
-        }
-        console.log('✅ Sample books added');
+// ✅ فقط إنشاء حساب المسؤول (بدون أي مستخدمين أو كتب تجريبية)
+const initAdmin = async () => {
+    const adminEmail = process.env.ADMIN_EMAIL || 'admin@bookstore.com';
+    const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
+    const existing = await pool.query(`SELECT * FROM customers WHERE email = $1`, [adminEmail]);
+    if (existing.rows.length === 0) {
+        const hashed = await bcrypt.hash(adminPassword, 10);
+        await pool.query(
+            `INSERT INTO customers (email, password_hash, full_name) VALUES ($1, $2, $3)`,
+            [adminEmail, hashed, 'System Administrator']
+        );
+        console.log(`✅ Admin user created: ${adminEmail} / ${adminPassword}`);
+    } else {
+        console.log(`✅ Admin user already exists: ${adminEmail}`);
     }
 };
 
-module.exports = { pool, createTables, initDefaultData };
+module.exports = { pool, createTables, initAdmin };

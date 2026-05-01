@@ -1,9 +1,8 @@
-﻿// server.js
-require('dotenv').config();
+﻿require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
-const { createTables, initDefaultData } = require('./config/database');
+const { createTables, initAdmin } = require('./config/database'); // ✅ استدعاء initAdmin
 
 const authRoutes = require('./routes/auth');
 const booksRoutes = require('./routes/books');
@@ -18,30 +17,27 @@ app.use(cors({ origin: process.env.CLIENT_URL || '*' }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Routes
 app.use('/api', authRoutes);
 app.use('/api/books', booksRoutes);
 app.use('/api/cart', cartRoutes);
 app.use('/api/orders', ordersRoutes);
 app.use('/api/wishlist', wishlistRoutes);
 
-// Serve frontend
 app.use(express.static(path.join(__dirname, '../frontend')));
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, '../frontend', 'index.html'));
 });
 
-createTables().then(() => {
-    initDefaultData().then(() => {
-        app.listen(PORT, () => {
-            console.log(`\n╔════════════════════════════════════════════════════════════╗`);
-            console.log(`║     📚 BookStore Ultimate is running on port ${PORT}        ║`);
-            console.log(`╠════════════════════════════════════════════════════════════╣`);
-            console.log(`║  📖 API: http://localhost:${PORT}/api/books                   ║`);
-            console.log(`║  👤 Demo: user@bookstore.com / user123                       ║`);
-            console.log(`║  👑 Admin: admin@bookstore.com / admin123                    ║`);
-            console.log(`╚════════════════════════════════════════════════════════════╝\n`);
-        });
+createTables().then(async () => {
+    await initAdmin();  // ✅ فقط إنشاء المسؤول
+    app.listen(PORT, () => {
+        console.log(`\n╔════════════════════════════════════════════════════════════╗`);
+        console.log(`║     📚 BookStore Ultimate is running on port ${PORT}        ║`);
+        console.log(`╠════════════════════════════════════════════════════════════╣`);
+        console.log(`║  👤 Admin: ${process.env.ADMIN_EMAIL || 'admin@bookstore.com'} / ${process.env.ADMIN_PASSWORD || 'admin123'} ║`);
+        console.log(`║  🛡️ Customer registration with captcha enabled             ║`);
+        console.log(`║  📦 Sellers need admin approval                            ║`);
+        console.log(`╚════════════════════════════════════════════════════════════╝\n`);
     });
 }).catch(err => {
     console.error('❌ Failed to initialize database:', err);
