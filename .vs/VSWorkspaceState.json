@@ -1,9 +1,13 @@
 {
   "ExpandedNodes": [
     "",
-    "\\backend",
-    "\\frontend"
+    "\\backend\\config",
+    "\\backend\\middleware",
+    "\\backend\\routes",
+    "\\backend\\utils",
+    "\\frontend\\css",
+    "\\frontend\\js"
   ],
-  "SelectedNode": "\\.env",
+  "SelectedNode": "\\package.json",
   "PreviewInSolutionExplorer": false
 }
